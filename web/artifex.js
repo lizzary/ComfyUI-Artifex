@@ -50,6 +50,12 @@ function widget(node, name) {
   return node.widgets?.find((item) => item.name === name);
 }
 
+function identifyPack(node) {
+  node.properties ??= {};
+  node.properties.cnr_id ||= "comfyui-artifex";
+  node.properties.aux_id ||= "lizzary/ComfyUI-Artifex";
+}
+
 function removeAutoTagSocket(node) {
   // Some frontend builds omit socketless from BOOLEAN widget options, and old
   // workflows can restore the former socket. Keep this control widget-only.
@@ -219,6 +225,7 @@ async function deleteImage(node, index) {
 
 function addNodeUI(node) {
   if (states.has(node)) return;
+  identifyPack(node);
   removeAutoTagSocket(node);
   alignNameInputs(node);
   const row = document.createElement("div");
@@ -257,7 +264,17 @@ function addNodeUI(node) {
   const configured = node.onConfigure;
   node.onConfigure = function (...args) {
     const result = configured?.apply(this, args);
+    identifyPack(this);
     removeAutoTagSocket(this);
+    return result;
+  };
+  const serialized = node.onSerialize;
+  node.onSerialize = function (data) {
+    const result = serialized?.apply(this, arguments);
+    // Embed the package identity even without Manager or a completed registry index.
+    // Keep any version recorded by Manager instead of guessing a release number.
+    identifyPack(this);
+    identifyPack(data);
     return result;
   };
   const executed = node.onExecuted;

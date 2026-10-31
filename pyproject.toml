@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-artifex"
 description = "Save ComfyUI images directly into a bundled Artifex gallery."
-version = "0.1.0"
+version = "0.1.1"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 dependencies = []

@@ -82,6 +82,37 @@ test("all open actions ask the server to launch the system application without b
   node.onRemoved();
 });
 
+test("new and restored nodes export their package identity without Manager", () => {
+  const harness = setup();
+  const node = harness.node();
+  assert.equal(node.properties.cnr_id, "comfyui-artifex");
+  assert.equal(node.properties.aux_id, "lizzary/ComfyUI-Artifex");
+
+  node.properties = { "Node name for S&R": "SaveInArtifex", ver: "0.1.0" };
+  node.onConfigure();
+  assert.equal(node.properties.cnr_id, "comfyui-artifex");
+  assert.equal(node.properties.ver, "0.1.0");
+
+  // A late Manager update must not leave a subsequently exported workflow unidentified.
+  node.properties.cnr_id = "";
+  const exported = { properties: { ...node.properties } };
+  node.onSerialize(exported);
+  assert.equal(exported.properties.cnr_id, "comfyui-artifex");
+  assert.equal(exported.properties.aux_id, "lizzary/ComfyUI-Artifex");
+  assert.equal(exported.properties.ver, "0.1.0");
+  node.onRemoved();
+});
+
+test("both example formats identify the package when its node is missing", () => {
+  const workflow = JSON.parse(fs.readFileSync(new URL("../examples/save-in-artifex.json", import.meta.url), "utf8"));
+  const prompt = JSON.parse(fs.readFileSync(new URL("../examples/save-in-artifex-api.json", import.meta.url), "utf8"));
+  const properties = workflow.nodes.find(node => node.type === "SaveInArtifex").properties;
+  assert.equal(properties.cnr_id, "comfyui-artifex");
+  assert.equal(properties.aux_id, "lizzary/ComfyUI-Artifex");
+  assert.equal(prompt["2"]._meta.cnr_id, properties.cnr_id);
+  assert.equal(prompt["2"]._meta.aux_id, properties.aux_id);
+});
+
 test("connected inputs disable their fallback choices; option IDs retain readable labels", async () => {
   const harness = setup();
   const node = harness.node();

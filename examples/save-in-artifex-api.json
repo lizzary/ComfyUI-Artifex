@@ -5,6 +5,11 @@
   },
   "2": {
     "class_type": "SaveInArtifex",
+    "_meta": {
+      "title": "Save in Artifex",
+      "cnr_id": "comfyui-artifex",
+      "aux_id": "lizzary/ComfyUI-Artifex"
+    },
     "inputs": {
       "images": ["1", 0],
       "group": "default",

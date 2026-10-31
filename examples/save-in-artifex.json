@@ -29,7 +29,11 @@
         {"name": "color_group_name", "type": "STRING", "link": null}
       ],
       "outputs": [],
-      "properties": {"Node name for S&R": "SaveInArtifex"},
+      "properties": {
+        "Node name for S&R": "SaveInArtifex",
+        "cnr_id": "comfyui-artifex",
+        "aux_id": "lizzary/ComfyUI-Artifex"
+      },
       "widgets_values": ["default", "", false]
     }
   ],
