@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkartifex_frontend=self.webpackChunkartifex_frontend||[]).push([[929],{9929(e,f,n){n.r(f);n(2833),n(1418),n(7535)}}]);

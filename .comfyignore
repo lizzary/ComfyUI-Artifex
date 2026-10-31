@@ -1,0 +1,14 @@
+.github/
+.idea/
+.cache/
+.test-comfy/
+.artifex-integration-*/
+.artifex-test-*/
+tests/
+scripts/
+docs/
+**/__pycache__/
+runtime/
+data/
+staging/
+logs/

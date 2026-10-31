@@ -1,0 +1,14 @@
+{
+  "SaveInArtifex": {
+    "display_name": "Save in Artifex",
+    "description": "Save generated images in Artifex. Right-click a preview to delete that image from the library.",
+    "inputs": {
+      "images": { "name": "Images" },
+      "group": { "name": "Group", "tooltip": "Target group; also the fallback when the connected group name cannot be used." },
+      "color_group": { "name": "Color group", "tooltip": "Optional. None uploads without assigning a color group." },
+      "auto_tag": { "name": "Auto-tag", "tooltip": "Ask Artifex to automatically tag uploaded images." },
+      "group_name": { "name": "Group name", "tooltip": "Overrides the group selection. Creates missing groups and uses the most populated match for duplicate names." },
+      "color_group_name": { "name": "Color group name", "tooltip": "Overrides the color group selection. Creates missing color groups and uses the most populated match for duplicate names." }
+    }
+  }
+}

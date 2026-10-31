@@ -1,0 +1,14 @@
+{
+  "SaveInArtifex": {
+    "display_name": "儲存到 Artifex",
+    "description": "將生成的圖像儲存到 Artifex。右鍵預覽圖可立即從圖庫刪除該圖像。",
+    "inputs": {
+      "images": { "name": "圖像" },
+      "group": { "name": "分組", "tooltip": "目標分組；連接的分組名不可用時回退到此選項。" },
+      "color_group": { "name": "顏色組", "tooltip": "選填，選擇「無」時不分配顏色組。" },
+      "auto_tag": { "name": "自動標籤", "tooltip": "請求 Artifex 自動為上傳的圖像加入標籤。" },
+      "group_name": { "name": "分組名", "tooltip": "優先於選項。不存在時新建；同名時使用檔案最多的分組。" },
+      "color_group_name": { "name": "顏色組名", "tooltip": "優先於選項。不存在時新建；同名時使用檔案最多的顏色組。" }
+    }
+  }
+}
