@@ -56,7 +56,12 @@ function setup() {
           input.boundingRect = [x - 10, y - 10, 20, 20];
         });
       },
-      addDOMWidget(_name, _type, element) { this.actionRow = element; return {}; },
+      addDOMWidget(name, type, element, options) {
+        this.actionRow = element;
+        const control = { name, type, element, options, margin: 10, draw() {} };
+        this.widgets.push(control);
+        return control;
+      },
       setSize(size) { this.size = size; this.arrange(); }, setDirtyCanvas() {}, imgs: [{}, {}, {}],
     };
     extension.nodeCreated(value);
@@ -177,6 +182,43 @@ test("STRING sockets align native link positions and hit boxes with the fallback
   const groupIndex = node.inputs.findIndex((input) => input.name === "group_name");
   assert.equal(node.inputs[groupIndex].boundingRect[1] + 10, node.getInputPos(groupIndex)[1]);
   assert.equal(node.widgets[0].value, "id:1");
+  node.onRemoved();
+});
+
+test("selecting a node in the parameter panel cannot change the action row's canvas width", () => {
+  const harness = setup();
+  const node = harness.node();
+  const actions = node.widgets.find(control => control.name === "artifex_actions");
+  const canvasWidth = () => (actions.width ?? node.size[0]) - 2 * actions.margin;
+
+  // ComfyUI's parameter panel renders unknown widget types with WidgetLegacy.
+  // That renderer writes its own width and y back into the shared widget.
+  const selectInPanel = (panelWidth) => {
+    const controls = node.widgets.filter(control => !control.options.hideInPanel && !control.options.canvasOnly);
+    for (const control of controls) {
+      if (!control.draw) continue;
+      control.y = 0;
+      control.width = panelWidth;
+      control.draw();
+    }
+    node.arrange();
+    return controls;
+  };
+
+  assert.equal(canvasWidth(), 340);
+  for (const panelWidth of [470, 213]) {
+    const controls = selectInPanel(panelWidth);
+    assert.equal(canvasWidth(), 340, "selection must neither overflow nor shrink the action row");
+    assert.deepEqual(controls.map(control => control.name), ["group", "color_group", "auto_tag"]);
+  }
+  node.setSize([600, 500]);
+  selectInPanel(470);
+  assert.equal(canvasWidth(), 580, "the action row must keep following node resizes");
+  node.onConfigure({});
+  harness.extension.loadedGraphNode(node);
+  selectInPanel(213);
+  assert.equal(canvasWidth(), 580, "restoring a workflow must preserve the layout policy");
+  assert.equal(actions.serialize, false);
   node.onRemoved();
 });
 

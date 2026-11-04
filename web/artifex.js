@@ -239,7 +239,10 @@ function addNodeUI(node) {
     row.append(button);
   }
   const actions = node.addDOMWidget("artifex_actions", "artifex-actions", row, {
-    serialize: false, hideOnZoom: false, getMinHeight: () => 52, getMaxHeight: () => 52,
+    // The parameter panel's legacy renderer overwrites the shared widget's
+    // width when the node is selected. These actions belong on the node only.
+    serialize: false, hideOnZoom: false, hideInPanel: true,
+    getMinHeight: () => 52, getMaxHeight: () => 52,
   });
   actions.serialize = false;
   states.set(node, { groupButton, stagingButton, sequence: 0, autoTagAvailable: true, deleting: new Set() });
