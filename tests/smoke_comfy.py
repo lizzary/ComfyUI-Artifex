@@ -29,8 +29,9 @@ def main():
         "1": {"class_type": "EmptyImage", "inputs": {"width": 32, "height": 24, "batch_size": 3, "color": 2848554}},
         "2": {"class_type": "SaveInArtifex", "inputs": {
             "images": ["1", 0], "group": "deleted-group", "color_group": "deleted-color", "auto_tag": False,
-            "group_name": group_name, "color_group_name": "smoke-color",
+            "group_name": group_name, "color_group_name": ["3", 0],
         }},
+        "3": {"class_type": "TruncateText", "inputs": {"texts": "smoke-color", "max_length": 77}},
     }
     queued = request("/prompt", "POST", {"prompt": prompt, "extra_data": {"extra_pnginfo": {"workflow": {"nodes": []}}}})
     prompt_id = queued["prompt_id"]
@@ -56,6 +57,8 @@ def main():
         config = request("/api/group-config", origin=gallery)
         colors = config["groups"][str(group_id)]["colors"]["sets"][0]
         assert len(colors["manual_assignments"]) == 3
+        assert len(colors["pairs"]) == 1 and colors["pairs"][0]["customName"] == "smoke-color", colors
+        assert set(colors["manual_assignments"].values()) == {colors["pairs"][0]["id"]}, colors
         first = output["artifex_images"][0]
         data = request(f"/api/illustrations/{first['image_id']}/file", origin=gallery, raw=True)
         with Image.open(io.BytesIO(data)) as image:

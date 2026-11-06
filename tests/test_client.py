@@ -19,7 +19,9 @@ class ClientTests(unittest.TestCase):
 
     def test_named_group_uses_highest_count_and_stable_tie(self):
         self.client.groups = Mock(return_value=[{"id": 1, "name": "sea", "illustration_count": 2}, {"id": 3, "name": "sea", "illustration_count": 8}, {"id": 2, "name": "sea", "illustration_count": 8}])
-        self.assertEqual(self.client.resolve_group(name="sea")["id"], 2)
+        for name in ("sea", [" sea "], ("sea",)):
+            with self.subTest(name=name):
+                self.assertEqual(self.client.resolve_group(name=name)["id"], 2)
 
     def test_invalid_input_falls_back_to_selected_group(self):
         self.client.groups = Mock(return_value=[{"id": 4, "name": "saved", "value": "id:4", "label": "saved", "illustration_count": 0}])
@@ -37,6 +39,62 @@ class ClientTests(unittest.TestCase):
         ], "match_order": ["a", "b"], "manual_assignments": {"3": "b"}}]}
         self.client.illustrations = Mock(return_value=[{"id": 1, "tags": "sea,blue"}, {"id": 2, "tags": "blue"}, {"id": 3, "tags": "sea"}])
         self.assertEqual(self.client._color_counts(1, colors), {("board", "a"): 1, ("board", "b"): 2})
+
+    def test_wrapped_color_name_creates_in_active_or_new_set(self):
+        for active_id in ("board", None):
+            for name in ([" 1234 "], ("1234",)):
+                with self.subTest(active_id=active_id, name=name):
+                    sets = [{"id": active_id, "pairs": []}] if active_id else []
+                    self.client._color_config = Mock(return_value={"sets": sets, "active_id": active_id})
+                    self.client._request = Mock()
+                    color = self.client.resolve_color(26, name=name)
+                    self.assertIsNotNone(color)
+                    self.assertEqual(color["customName"], "1234")
+                    operations = [{"type": "create_pair", "set_id": color["set_id"],
+                                   "pair": {key: color[key] for key in ("id", "customName", "terms", "color", "borderColor")}}]
+                    if active_id:
+                        self.assertEqual(color["set_id"], active_id)
+                    else:
+                        operations.insert(0, {"type": "create_set", "set": {"id": color["set_id"], "name": "ComfyUI"}})
+                    self.client._request.assert_called_once_with(
+                        "POST", "/api/groups/26/color-operations", payload={"operations": operations})
+
+    def test_wrapped_color_name_reuses_existing_match_before_dropdown(self):
+        pair = {"id": "existing", "customName": "1234", "terms": []}
+        self.client._color_config = Mock(return_value={"sets": [{"id": "board", "pairs": [pair]}]})
+        self.client._request = Mock()
+        self.client.illustrations = Mock()
+        color = self.client.resolve_color(26, name=["1234"], selected="board:other")
+        self.assertIsNotNone(color)
+        self.assertEqual(color["value"], "board:existing")
+        self.client._request.assert_not_called()
+        self.client.illustrations.assert_not_called()
+
+    def test_wrapped_duplicate_color_name_uses_most_populated_match(self):
+        self.client._color_config = Mock(return_value={"active_id": "a", "sets": [
+            {"id": "a", "pairs": [{"id": "first", "customName": "1234", "terms": [term("sea")]}],
+             "manual_assignments": {"1": "first"}},
+            {"id": "b", "pairs": [{"id": "second", "customName": "1234", "terms": [term("blue")]}],
+             "manual_assignments": {"2": "second"}},
+        ]})
+        self.client.illustrations = Mock(return_value=[
+            {"id": 1, "tags": "sea,blue"}, {"id": 2, "tags": ""}, {"id": 3, "tags": "blue"},
+        ])
+        self.client._request = Mock()
+        color = self.client.resolve_color(26, name=["1234"], selected="a:first")
+        self.assertIsNotNone(color)
+        self.assertEqual(color["value"], "b:second")
+        self.client._request.assert_not_called()
+
+    def test_invalid_color_names_keep_dropdown_and_none_fallbacks(self):
+        selected = {"id": "selected", "set_id": "board", "value": "board:selected", "label": "Selected"}
+        self.client.color_groups = Mock(return_value=[selected])
+        self.client._request = Mock()
+        for name in (None, "", "  ", [], (), [""], ["a", "b"], ("a", "b"), [1234], 1234, {"name": "1234"}):
+            with self.subTest(name=name):
+                self.assertEqual(self.client.resolve_color(26, name=name, selected="board:selected"), selected)
+                self.assertIsNone(self.client.resolve_color(26, name=name))
+        self.client._request.assert_not_called()
 
     def test_mixed_rules_preserve_parentheses_negation_and_precedence(self):
         # (sea OR sky) AND NOT night

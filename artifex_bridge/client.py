@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import json
 import logging
 import re
+import secrets
 import threading
 from urllib.error import HTTPError, URLError
 from urllib.request import ProxyHandler, Request, build_opener
@@ -15,6 +16,12 @@ from .process import ArtifexUnavailable
 
 log = logging.getLogger("comfyui.artifex")
 DEFAULT_GROUP = "ComfyUI"
+# Artifex frontend/src/hooks/useGroupConfig.js: GROUP_COLORS.
+GROUP_COLORS = (
+    (239, 68, 68), (59, 130, 246), (34, 197, 94), (251, 191, 36),
+    (168, 85, 247), (236, 72, 153), (20, 184, 166), (249, 115, 22),
+    (99, 102, 241), (244, 114, 182),
+)
 
 
 class ArtifexError(RuntimeError):
@@ -50,6 +57,25 @@ def _decorate(items):
         label = f'{item["name"]}(id:{identifier})' if counts[item["name"]] > 1 else item["name"]
         decorated.append(dict(item, label=label))
     return decorated
+
+
+def _input_name(value):
+    # Some ComfyUI text nodes (e.g. TruncateText) wrap a scalar STRING in a
+    # one-item list without declaring a list output. Accept that wrapper,
+    # but keep ambiguous lists and non-text inputs on the normal fallback path.
+    if isinstance(value, (list, tuple)) and len(value) == 1:
+        value = value[0]
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _random_group_colors():
+    # Match Artifex's groupColorsFromHex opacity without consuming the random
+    # state used by ComfyUI workflows. Pick once, when the group is created.
+    red, green, blue = secrets.choice(GROUP_COLORS)
+    return {
+        "color": f"rgba({red}, {green}, {blue}, 0.08)",
+        "borderColor": f"rgba({red}, {green}, {blue}, 0.35)",
+    }
 
 
 def _pair_name(pair):
@@ -163,9 +189,9 @@ class ArtifexClient:
 
     def resolve_group(self, name=None, selected="default"):
         with self._resolve_lock:
-            if isinstance(name, str) and name.strip():
+            clean = _input_name(name)
+            if clean:
                 try:
-                    clean = name.strip()
                     # Artifex checks Go len(string), i.e. UTF-8 bytes.
                     if len(clean.encode("utf-8")) > 100:
                         raise ValueError("Group names must fit in 100 UTF-8 bytes")
@@ -226,9 +252,9 @@ class ArtifexClient:
 
     def resolve_color(self, group_id, name=None, selected=""):
         with self._resolve_lock:
-            if isinstance(name, str) and name.strip():
+            clean = _input_name(name)
+            if clean:
                 try:
-                    clean = name.strip()
                     colors = self._color_config(group_id)
                     matches = [(color_set, pair) for color_set in colors.get("sets", [])
                                for pair in color_set.get("pairs", []) if _pair_name(pair) == clean]
@@ -241,7 +267,7 @@ class ArtifexClient:
                     if not set_id:
                         set_id = "artifex-" + uuid4().hex
                         operations.append({"type": "create_set", "set": {"id": set_id, "name": "ComfyUI"}})
-                    pair = {"id": uuid4().hex, "customName": clean, "terms": [], "color": "#60a5fa", "borderColor": "#2563eb"}
+                    pair = {"id": uuid4().hex, "customName": clean, "terms": [], **_random_group_colors()}
                     operations.append({"type": "create_pair", "set_id": set_id, "pair": pair})
                     self._request("POST", f"/api/groups/{int(group_id)}/color-operations", payload={"operations": operations})
                     return dict(pair, set_id=set_id, name=clean, value=f'{set_id}:{pair["id"]}')

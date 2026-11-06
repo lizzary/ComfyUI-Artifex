@@ -32,7 +32,10 @@ def main():
             process.ensure_running()
             assert process._busy_backend_alive(process._process), "Static frontend probe is unsupported"
             group = client.resolve_group(name="integration")
-            color = client.resolve_color(group["id"], name="blue")
+            # TruncateText can deliver a one-item list through its STRING socket.
+            color = client.resolve_color(group["id"], name=["1234"])
+            assert color is not None and color["customName"] == "1234", color
+            assert client.resolve_color(group["id"], name=["1234"])["value"] == color["value"]
             library = process.library_id
             def chunk(kind, data):
                 return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
@@ -40,10 +43,17 @@ def main():
             result = client.upload(group["id"], "20261031_1.png", png, library_id=library)
             assert result.status == "saved", result
             client.assign_color(group["id"], color, result.illustration["id"], library_id=library)
+            colors = client._color_config(group["id"])
+            assert len(colors["sets"]) == 1, colors
+            board = colors["sets"][0]
+            assert colors["active_id"] == board["id"] == color["set_id"], colors
+            assert len(board["pairs"]) == 1 and board["pairs"][0]["id"] == color["id"], board
+            assert board["manual_assignments"] == {str(result.illustration["id"]): color["id"]}, board
             assert client.image_bytes(result.illustration["id"], library_id=library)[0] == png
             process._process.kill()
             process._process.wait()
             assert client.image_bytes(result.illustration["id"], library_id=library)[0] == png
+            assert client._color_config(group["id"]) == colors, "Color membership was not persisted"
             assert process.expected_library(library) == process.library_id
             client.delete_image(result.illustration["id"], library_id=library)
             settings_before = client._request("GET", "/api/settings")

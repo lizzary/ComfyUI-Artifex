@@ -35,6 +35,8 @@ Supports Windows x64, Linux x64, and macOS Apple Silicon. The repository include
 
 Name inputs create missing groups. If multiple groups share a name, the one containing the most images is selected. Invalid inputs or resolution errors fall back to the dropdown selection, then to **ComfyUI / None**.
 
+Single-text lists from upstream nodes (such as **Truncate Text**) are also accepted as name inputs.
+
 When auto-tagging is enabled and a tagging model is available, the model infers tags for uploaded images.
 
 ## Open Artifex

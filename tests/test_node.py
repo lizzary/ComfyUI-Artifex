@@ -72,7 +72,7 @@ class NodeTests(unittest.TestCase):
             return {"id": 8}
         self.client.resolve_group.side_effect = resolve
         result = self.node.SaveInArtifex().save_images(
-            [Tensor(), Tensor()], group_name="海边", color_group_name="双手比v",
+            [Tensor(), Tensor()], group_name="海边", color_group_name=["双手比v"],
             prompt={"node": {}}, extra_pnginfo={"workflow": {"nodes": []}},
         )
         self.assertEqual(list((self.root / "staging").iterdir()), [self.root / "staging" / MARKER])
@@ -81,6 +81,7 @@ class NodeTests(unittest.TestCase):
         self.assertEqual(len(list((self.root / "temp" / "artifex").glob("*.png"))), 2)
         self.assertEqual(self.client.assign_color.call_count, 2)
         self.client.resolve_group.assert_called_once_with(name="海边", selected="default")
+        self.client.resolve_color.assert_called_once_with(8, name=["双手比v"], selected="")
 
     def test_staging_failure_still_uploads_memory(self):
         self.runtime.config.staging_dir.write_bytes(b"not a directory")
