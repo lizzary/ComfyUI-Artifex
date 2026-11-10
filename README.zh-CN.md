@@ -50,7 +50,7 @@ git clone https://github.com/lizzary/ComfyUI-Artifex.git
 
 | 路径 | 内容 |
 | --- | --- |
-| `bin/` | 已校验的 Artifex v2.6.1 三平台二进制、动态库和原版 React 前端 |
+| `bin/` | 已校验的 Artifex v2.7.0 三平台二进制、动态库和原版 React 前端 |
 | `runtime/bin/` | 当前平台的运行副本与 `config.toml` |
 | `data/` | 插件图库数据库、原图、缩略图等，备份时保留整个目录 |
 | `staging/` | 临时批次和失败时保留的图片 |

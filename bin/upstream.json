@@ -1,26 +1,26 @@
 {
   "repository": "https://github.com/lizzary/Artifex",
-  "version": "v2.6.1",
-  "release": "https://github.com/lizzary/Artifex/releases/tag/v2.6.1",
+  "version": "v2.7.0",
+  "release": "https://github.com/lizzary/Artifex/releases/tag/v2.7.0",
   "onnxruntime": "1.26.0",
   "assets": [
     {
       "platform": "windows-amd64",
       "name": "artifex-windows-amd64.zip",
-      "url": "https://github.com/lizzary/Artifex/releases/download/v2.6.1/artifex-windows-amd64.zip",
-      "sha256": "1c3edaa23b1935cfdc48af081ee17d4bf40f2a113b6f62e381305fe93ca800a8"
+      "url": "https://github.com/lizzary/Artifex/releases/download/v2.7.0/artifex-windows-amd64.zip",
+      "sha256": "4ccd11dc1189a336f75dc05f5c94c625edcbd84eeaa9cb198a06ff7e508630be"
     },
     {
       "platform": "linux-amd64",
       "name": "artifex-linux-amd64.tar.gz",
-      "url": "https://github.com/lizzary/Artifex/releases/download/v2.6.1/artifex-linux-amd64.tar.gz",
-      "sha256": "bec6dbabe5b9e5f8e64d9a8023164f4ca86b58a57920070c79bf9488d0ae30d5"
+      "url": "https://github.com/lizzary/Artifex/releases/download/v2.7.0/artifex-linux-amd64.tar.gz",
+      "sha256": "7e66061f653172db0a5cea12115fdc090300f3e15c66f9ca0b0844e591d7e5f0"
     },
     {
       "platform": "darwin-arm64",
       "name": "artifex-darwin-arm64.tar.gz",
-      "url": "https://github.com/lizzary/Artifex/releases/download/v2.6.1/artifex-darwin-arm64.tar.gz",
-      "sha256": "2303a654bc351dba6dbac74fe3276fcc3390049baed6df0875e09f70c72fd056"
+      "url": "https://github.com/lizzary/Artifex/releases/download/v2.7.0/artifex-darwin-arm64.tar.gz",
+      "sha256": "be09718f3586cd546e244e5fc5e8ffc06368d6d768bdc5b3c201e1096eb33fa7"
     }
   ]
 }
