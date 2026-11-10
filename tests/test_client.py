@@ -36,8 +36,11 @@ class ClientTests(unittest.TestCase):
     def test_color_counts_include_computed_rules_and_manual_override(self):
         colors = {"sets": [{"id": "board", "pairs": [
             {"id": "a", "terms": [term("sea")]}, {"id": "b", "terms": [term("blue")]},
-        ], "match_order": ["a", "b"], "manual_assignments": {"3": "b"}}]}
-        self.client.illustrations = Mock(return_value=[{"id": 1, "tags": "sea,blue"}, {"id": 2, "tags": "blue"}, {"id": 3, "tags": "sea"}])
+        ], "match_order": ["a", "b"], "manual_assignments": {"3": "b", "4": ""}}]}
+        self.client.illustrations = Mock(return_value=[
+            {"id": 1, "tags": "sea,blue"}, {"id": 2, "tags": "blue"},
+            {"id": 3, "tags": "sea"}, {"id": 4, "tags": "sea"},
+        ])
         self.assertEqual(self.client._color_counts(1, colors), {("board", "a"): 1, ("board", "b"): 2})
 
     def test_wrapped_color_name_creates_in_active_or_new_set(self):

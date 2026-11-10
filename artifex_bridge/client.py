@@ -244,6 +244,9 @@ class ArtifexClient:
             assignments = color_set.get("manual_assignments", {})
             for image in images:
                 target = assignments.get(str(image["id"]))
+                if target == "":
+                    # Artifex uses an empty assignment to explicitly leave an image ungrouped.
+                    continue
                 if target not in pairs:
                     target = next((pair_id for pair_id in order if pair_id in pairs and _matches(image, pairs[pair_id])), None)
                 if target:

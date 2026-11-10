@@ -49,7 +49,7 @@ When auto-tagging is enabled and a tagging model is available, the model infers 
 
 | Path | Contents |
 | --- | --- |
-| `bin/` | Verified Artifex v2.7.0 binaries for all three platforms, shared libraries, and the original React frontend |
+| `bin/` | Verified Artifex v2.7.1 binaries for all three platforms, shared libraries, and the original React frontend |
 | `runtime/bin/` | Runtime copies for the current platform and `config.toml` |
 | `data/` | Gallery database, original images, thumbnails, and other data; back up the entire directory |
 | `staging/` | Temporary batches and images retained after failures |
