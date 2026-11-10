@@ -1,10 +1,12 @@
 """Own exactly one child process; never attach to or kill another Artifex."""
 
 import atexit
+import errno
 import json
 import logging
 import os
 from pathlib import Path
+import re
 import shutil
 import socket
 import subprocess
@@ -16,6 +18,12 @@ from urllib.request import ProxyHandler, Request, build_opener
 from .config import Config
 
 log = logging.getLogger("comfyui.artifex")
+_READY_PORT = re.compile(rb"\bINFO +server +gallery ready at http://127\.0\.0\.1:(\d+)\r?\n")
+_DEFAULT_PORT = 18951
+_MIN_PORT = 10000
+_MAX_PORT = 65535
+_MAX_PORT_OFFSET = 100
+_UNAVAILABLE_PORT_ERRORS = {errno.EADDRINUSE, errno.EACCES, getattr(errno, "WSAEACCES", errno.EACCES)}
 
 
 class ArtifexUnavailable(RuntimeError):
@@ -29,7 +37,9 @@ class ArtifexProcess:
         self._lock = threading.RLock()
         self._base_url = ""
         self._port = config.port
+        self._port_file = config.runtime_dir / "port.txt"
         self._backend_log = None
+        self._startup_log_offset = None
         self._opener = build_opener(ProxyHandler({}))
         self.library_id = None
         self._database_dir = None
@@ -49,6 +59,17 @@ class ArtifexProcess:
         child = self._process
         if child is None or child.poll() is not None:
             return False
+        if self._startup_log_offset is not None:
+            # The backend can try the next port when an existing config permits
+            # it. Wait for its listening address before contacting any service.
+            with open(self._backend_log.name, "rb") as stream:
+                stream.seek(self._startup_log_offset)
+                ready = _READY_PORT.search(stream.read())
+            if ready is None:
+                return False
+            if int(ready[1]) != self._port:
+                raise ArtifexUnavailable(f"Artifex could not listen on the selected port {self._port}")
+            self._startup_log_offset = None
         try:
             request = Request(self._base_url + "/api/groups", headers={"Accept": "application/json"})
             with self._opener.open(request, timeout=1.0) as response:
@@ -59,6 +80,8 @@ class ArtifexProcess:
                 settings_request = Request(self._base_url + "/api/settings", headers={"X-Artifex-Library": library_id})
                 with self._opener.open(settings_request, timeout=1.0) as settings_response:
                     database_dir = str(Path(json.load(settings_response)["database_dir"]).resolve())
+                if child.poll() is not None:
+                    return False
                 if self.library_id and self.library_id != library_id:
                     if self._restart_pending and self._database_dir == database_dir:
                         self._library_aliases = {old: library_id for old in self._library_aliases}
@@ -122,14 +145,41 @@ class ArtifexProcess:
             )
         return executable
 
+    def _select_port(self) -> int:
+        start = self.config.port
+        if not start:
+            try:
+                start = int(self._port_file.read_text(encoding="utf-8"))
+            except (FileNotFoundError, ValueError):
+                start = _DEFAULT_PORT
+            if not _MIN_PORT <= start <= _MAX_PORT:
+                start = _DEFAULT_PORT
+        elif not _MIN_PORT <= start <= _MAX_PORT:
+            raise ArtifexUnavailable(f"Artifex start port must be between {_MIN_PORT} and {_MAX_PORT}")
+
+        end = min(start + _MAX_PORT_OFFSET, _MAX_PORT)
+        # Windows must detect exclusive listeners. On POSIX, match Go's
+        # listener and allow reuse of an address with only TIME_WAIT sockets.
+        socket_option = socket.SO_EXCLUSIVEADDRUSE if os.name == "nt" else socket.SO_REUSEADDR
+        for port in range(start, end + 1):
+            with socket.socket() as probe:
+                probe.setsockopt(socket.SOL_SOCKET, socket_option, 1)
+                try:
+                    probe.bind(("127.0.0.1", port))
+                    probe.listen()
+                except OSError as exc:
+                    if exc.errno not in _UNAVAILABLE_PORT_ERRORS:
+                        raise
+                else:
+                    return port
+        raise ArtifexUnavailable(f"No available Artifex port on 127.0.0.1 in range {start}-{end}")
+
     def _spawn(self):
         executable = self._prepare()
-        if not self._port:
-            with socket.socket() as probe:
-                probe.bind(("127.0.0.1", 0))
-                self._port = probe.getsockname()[1]
+        self._port = self._select_port()
         self._base_url = f"http://127.0.0.1:{self._port}"
         self._backend_log = (self.config.log_dir / "artifex-backend.log").open("ab", buffering=0)
+        self._startup_log_offset = self._backend_log.tell()
         kwargs = {}
         if os.name == "nt":
             kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
@@ -156,6 +206,7 @@ class ArtifexProcess:
                 child.kill()
                 child.wait(timeout=5)
         self._process = None
+        self._startup_log_offset = None
         if self._backend_log:
             self._backend_log.close()
             self._backend_log = None

@@ -1,8 +1,9 @@
 from concurrent.futures import ThreadPoolExecutor
+import errno
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import call, MagicMock, Mock, patch
 from urllib.error import HTTPError
 
 from artifex_bridge.config import Config
@@ -87,6 +88,60 @@ class ProcessTests(unittest.TestCase):
                 urls = list(pool.map(lambda _: process.ensure_running(), range(8)))
             self.assertEqual(process._spawn.call_count, 1)
             self.assertEqual(len(set(urls)), 1)
+            process.stop()
+
+    def test_port_search_restarts_at_saved_base(self):
+        with TemporaryDirectory(dir=Path(__file__).resolve().parents[1]) as directory:
+            config = Config(root=Path(directory))
+            config.runtime_dir.mkdir()
+            port_file = config.runtime_dir / "port.txt"
+            port_file.write_text("23000\n", encoding="utf-8")
+            process = ArtifexProcess(config)
+            with patch("artifex_bridge.process.socket.socket") as socket_factory:
+                probe = socket_factory.return_value.__enter__.return_value
+                probe.bind.side_effect = [OSError(errno.EADDRINUSE, "occupied"), None, None]
+                self.assertEqual(process._select_port(), 23001)
+                self.assertEqual(process._select_port(), 23000)
+            self.assertEqual(port_file.read_text(encoding="utf-8"), "23000\n")
+
+    def test_port_search_includes_plus_100_and_stops_there(self):
+        process = ArtifexProcess(Config(port=23000))
+        with patch("artifex_bridge.process.socket.socket") as socket_factory:
+            probe = socket_factory.return_value.__enter__.return_value
+            occupied = OSError(errno.EADDRINUSE, "occupied")
+            probe.bind.side_effect = [occupied] * 100 + [None]
+            self.assertEqual(process._select_port(), 23100)
+            probe.bind.reset_mock(side_effect=True)
+            probe.bind.side_effect = occupied
+            with self.assertRaisesRegex(ArtifexUnavailable, "range 23000-23100"):
+                process._select_port()
+            self.assertEqual(probe.bind.call_args_list, [call(("127.0.0.1", port)) for port in range(23000, 23101)])
+
+    def test_old_four_digit_port_uses_five_digit_default(self):
+        with TemporaryDirectory(dir=Path(__file__).resolve().parents[1]) as directory:
+            config = Config(root=Path(directory))
+            config.runtime_dir.mkdir()
+            (config.runtime_dir / "port.txt").write_text("1234\n", encoding="utf-8")
+            process = ArtifexProcess(config)
+            with patch("artifex_bridge.process.socket.socket"):
+                self.assertEqual(process._select_port(), 18951)
+
+    def test_startup_ignores_old_log_entries_and_rejects_backend_port_fallback(self):
+        with TemporaryDirectory(dir=Path(__file__).resolve().parents[1]) as directory:
+            log_path = Path(directory) / "backend.log"
+            log_path.write_bytes(b"00:00:00 INFO  server    gallery ready at http://127.0.0.1:12345\n")
+            process = ArtifexProcess(Config(root=Path(directory), port=12345))
+            process._process = Mock()
+            process._process.poll.return_value = None
+            process._opener.open = Mock()
+            with log_path.open("ab", buffering=0) as backend_log:
+                process._backend_log = backend_log
+                process._startup_log_offset = backend_log.tell()
+                self.assertFalse(process._ping())
+                backend_log.write(b"00:00:01 INFO  server    gallery ready at http://127.0.0.1:12346\n")
+                with self.assertRaisesRegex(ArtifexUnavailable, "could not listen on the selected port 12345"):
+                    process._ping()
+            process._opener.open.assert_not_called()
             process.stop()
 
     def test_prepare_creates_isolated_settings_and_does_not_rewrite_them(self):

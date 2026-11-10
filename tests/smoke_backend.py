@@ -3,7 +3,9 @@
 Creates and removes an isolated library, never the user's plugin data directory.
 """
 
+from contextlib import contextmanager
 from pathlib import Path
+import socket
 import struct
 from tempfile import TemporaryDirectory
 import zlib
@@ -11,6 +13,25 @@ import zlib
 from artifex_bridge.client import ArtifexClient, ArtifexError, ArtifexTaggingError
 from artifex_bridge.config import Config
 from artifex_bridge.process import ArtifexProcess
+
+
+@contextmanager
+def occupy_starting_port():
+    for _ in range(20):
+        with socket.socket() as blocker:
+            blocker.bind(("127.0.0.1", 0))
+            port = blocker.getsockname()[1]
+            if not 10000 <= port <= 65435:
+                continue
+            try:
+                with socket.socket() as probe:
+                    probe.bind(("127.0.0.1", port + 1))
+            except OSError:
+                continue
+            blocker.listen()
+            yield port
+            return
+    raise RuntimeError("Could not reserve a test port with an available neighbor")
 
 
 def main():
@@ -26,10 +47,26 @@ def main():
             return source.frontend_dir
 
     with TemporaryDirectory(prefix=".artifex-integration-", dir=source.root) as temp:
-        process = ArtifexProcess(TestConfig(root=Path(temp), retry_delay=0.05))
-        client = ArtifexClient(process)
+        config = TestConfig(root=Path(temp), retry_delay=0.05)
+        config.runtime_dir.mkdir()
+        port_file = config.runtime_dir / "port.txt"
+        with occupy_starting_port() as port:
+            port_file.write_text(f"{port}\n", encoding="utf-8")
+            process = ArtifexProcess(config)
+            try:
+                assert process.ensure_running() == f"http://127.0.0.1:{port + 1}"
+                assert int(port_file.read_text(encoding="utf-8")) == port, "Fallback changed the starting port"
+            finally:
+                process.stop()
+
+        process = ArtifexProcess(config)
         try:
-            process.ensure_running()
+            url = process.ensure_running()
+            assert url == f"http://127.0.0.1:{port}", "Restart did not return to the original port"
+            process.stop()
+            process = ArtifexProcess(config)
+            assert process.ensure_running() == url, "A fresh ComfyUI process would change the browser origin"
+            client = ArtifexClient(process)
             assert process._busy_backend_alive(process._process), "Static frontend probe is unsupported"
             group = client.resolve_group(name="integration")
             # TruncateText can deliver a one-item list through its STRING socket.
@@ -76,7 +113,7 @@ def main():
                 assert error.status == 409, error
             else:
                 raise AssertionError("Stale library token was accepted")
-            print("PASS real Artifex: start, group/color, upload, assign, preview, crash/restart, delete, tagging error, library isolation")
+            print("PASS real Artifex: port fallback/reuse, group/color, upload, assign, preview, crash/restart, delete, tagging error, library isolation")
         finally:
             process.stop()
 
